@@ -94,26 +94,22 @@ public class AIService {
                                    String instructions, int maxTokens) {
         String prompt = """
                 You are an experienced academic research-writing assistant.
-                Produce publication-style draft prose for the requested section.
+                Write a detailed academic research-paper section, not a brief overview.
 
                 Research topic: %s
                 Section: %s
 
-                Requirements:
-                - Follow the section-specific instructions below.
-                - Write substantive, well-organized academic prose, not a short summary.
-                - Use clear paragraphs, precise terminology, and logical transitions.
-                - Avoid repeating the same point to inflate length.
-                - Never invent sources, author names, citations, statistics,
-                  experiments, participant data, or research findings.
-                - If evidence or source material is unavailable, state the
-                  limitation and distinguish established background from
-                  proposed ideas or expected outcomes.
-                - Return only the section content, without the section heading,
-                  preamble, word count, or commentary.
-
-                Section-specific instructions:
+                Follow these instructions carefully:
                 %s
+
+                Write complete paragraphs with explanation, examples relevant to
+                the topic, critical analysis, transitions, and appropriate nuance.
+                Do not use bullet points as a substitute for the requested prose.
+                Never invent sources, author names, citations, statistics, experiments,
+                participant data, or research findings. Clearly label proposed methods
+                and expected outcomes; do not claim work was performed if it was not.
+                Return only the section content. Do not include a heading, preamble,
+                word count, or commentary.
                 """.formatted(topic, section, instructions);
 
         String generated = callOllama(prompt, maxTokens).trim();
@@ -121,7 +117,58 @@ public class AIService {
             throw new IllegalStateException(
                     "Ollama returned empty content for section: " + section);
         }
+
+        // Small local models may ignore requested lengths on the first pass.
+        // Ask them to expand once or twice rather than silently accepting a tiny section.
+        int minimumWords = switch (section) {
+            case "ABSTRACT" -> 140;
+            case "INTRODUCTION" -> 350;
+            case "LITERATURE REVIEW" -> 400;
+            case "METHODOLOGY" -> 300;
+            case "CONCLUSION" -> 200;
+            default -> 0;
+        };
+
+        for (int attempt = 0; attempt < 2
+                && minimumWords > 0
+                && countWords(generated) < minimumWords; attempt++) {
+            String expansionPrompt = """
+                    Expand the following academic research-paper section substantially.
+                    Topic: %s
+                    Section: %s
+                    Current word count: %d
+                    Minimum target: %d words.
+
+                    Preserve useful content, then add relevant explanation, analysis,
+                    examples, implications, limitations, and transitions in full paragraphs.
+                    Do not repeat sentences merely to increase length. Do not invent
+                    citations, sources, data, statistics, or findings. Keep proposed work
+                    clearly distinguished from completed research. Return only the
+                    complete expanded section, not notes or a word-count report.
+
+                    Existing section:
+                    %s
+                    """.formatted(topic, section, countWords(generated),
+                    minimumWords, generated);
+            String expanded = callOllama(expansionPrompt, maxTokens).trim();
+            if (expanded.isBlank()) {
+                break;
+            }
+            // Keep the more substantial response if the model unexpectedly shortens it.
+            if (countWords(expanded) > countWords(generated)) {
+                generated = expanded;
+            } else {
+                break;
+            }
+        }
         return generated;
+    }
+
+    private int countWords(String text) {
+        if (text == null || text.isBlank()) {
+            return 0;
+        }
+        return text.trim().split("\\s+").length;
     }
 
     private String callOllama(String prompt, int maxTokens) {
