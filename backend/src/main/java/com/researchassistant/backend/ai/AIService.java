@@ -118,8 +118,8 @@ public class AIService {
                     "Ollama returned empty content for section: " + section);
         }
 
-        // Small local models may ignore requested lengths on the first pass.
-        // Ask them to expand once or twice rather than silently accepting a tiny section.
+        // Keep local generation responsive: at most one expansion request per
+        // section, and only when the first response is clearly too short.
         int minimumWords = switch (section) {
             case "ABSTRACT" -> 140;
             case "INTRODUCTION" -> 350;
@@ -129,7 +129,7 @@ public class AIService {
             default -> 0;
         };
 
-        for (int attempt = 0; attempt < 2
+        for (int attempt = 0; attempt < 1
                 && minimumWords > 0
                 && countWords(generated) < minimumWords; attempt++) {
             String expansionPrompt = """
