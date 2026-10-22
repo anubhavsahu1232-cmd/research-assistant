@@ -30,8 +30,8 @@ public class AIService {
         result.put("topic", topic);
 
         result.put("title", generateSection(topic, "TITLE",
-                "Create one precise, informative academic research-paper title. Return only the title, without a heading or quotation marks. Maximum 20 words.",
-                100));
+                "Create exactly ONE concise academic research paper title containing 10 to 15 words inclusive (aim for 12). Return only the title on one line, with no Title label, quotation marks, explanation, or alternative titles. Avoid filler. Count the words before responding and revise the title until it has 10–15 words.",
+                60));
         result.put("abstract", generateSection(topic, "ABSTRACT",
                 "Write a complete academic abstract of 180–220 words. Include the research context, problem, aim, proposed approach, expected contribution, and limitations. Do not claim that experiments or results occurred if none were supplied. Clearly frame outcomes as expected when appropriate.",
                 450));
